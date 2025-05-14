@@ -164,8 +164,6 @@ body {
     border-radius: 0 0 var(--button-border-radius) var(--button-border-radius);
     transition: max-height 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* Note: padding is not animatable with max-height like this */
     /* If padding is desired when open, it should be on an inner div or applied when open */
-    padding-left: 16px; /* This will apply instantly when max-height > 0 */
-    padding-right: 16px; /* This will apply instantly when max-height > 0 */
 }
 
 #validationContentArea.open-content { padding-top: 16px; } /* Applied when class is added */
