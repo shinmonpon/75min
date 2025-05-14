@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Biglietto 75 Minuti</title>
+    <!-- Font Awesome might still be used for fixed-header back arrow -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="ticket_75min.css">
+    <link rel="manifest" href="/ticket/manifest.json"> <!-- Assuming manifest path is correct -->
+</head>
+<body>
+
+<div class="fixed-header">
+    <i class="fas fa-chevron-left back-arrow" onclick="history.back()"></i>
+    <span class="header-title">Ticket attivo</span>
+</div>
+
+<div class="ptr-indicator" id="ptrIndicator">
+    <img src="loading-gear.png" alt="Loading..." class="ptr-gear-img" id="ptrGearImg">
+</div>
+
+<div class="scroll-view" id="mainScrollView">
+    <div class="card" id="mainCard">
+
+        <img src="asf-logo.png" alt="ASF Logo" class="asf-logo" id="activateTicketLogo">
+
+        <div class="main-title-block">
+            <span class="main-title">RETE URBANA 75′</span>
+            <span class="sub-title">Titolo di viaggio integrato valido su tutte le linee con percorrenza urbana per 75′</span>
+        </div>
+
+        <!-- "Informazioni tessera" section REMOVED -->
+
+        <div class="validation-loop-wrapper">
+            <div class="clickable-header" id="validationHeaderButton" role="button" aria-expanded="true" aria-controls="validationContentArea">
+                <div class="icon-text-container">
+                    <img src="validazione.png" alt="Icona Validazione">
+                    <span>Controllo e validazione</span>
+                </div>
+                <img src="arrow-down.png" alt="Comprimi" class="chevron-img open-chevron" id="validationChevron">
+            </div>
+            <div id="validationContentArea" class="collapsible-content open-content" style="max-height: none; padding-top: 16px; padding-bottom: 16px;">
+                <img src="qr-code.png" class="qr-code-small" alt="QR Code" id="smallQrImage">
+                <button class="text-button-link underline" id="enlargeQrButton">Ingrandisci QRCode</button>
+                <div class="time-code-row">
+                    <div class="icon-text">
+                        <img src="clock.png" alt="Icona Orologio">
+                        <span id="liveClock">--:--:--</span>
+                    </div>
+                    <div class="icon-text">
+                        <img src="lock.png" alt="Icona Lucchetto">
+                        <span>862</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loop-image-container">
+                <div class="loop-scrolling-image">
+                    <img src="image.png" alt="Animated Zigzag Pattern 1">
+                    <img src="image.png" alt="Animated Zigzag Pattern 2">
+                    <img src="image.png" alt="Animated Zigzag Pattern 3">
+                </div>
+            </div>
+        </div>
+
+        <div class="status-banner" id="ticketStatusBanner">
+            <div id="tempoRestante">Tempo restante: --</div>
+            <div id="attivatoIl">Attivato il: --</div>
+        </div>
+
+        <div class="detail-item emesso-il">
+            <span class="label">Emesso il:</span>
+            <span class="value" id="emessoIlValue">--</span>
+        </div>
+        <div class="detail-item row-layout">
+            <span class="label costo-label">Costo</span>
+            <span class="price-value">1,50 €</span>
+        </div>
+
+        <hr class="separator">
+
+        <div class="detail-item row-layout">
+            <span class="label">Dettagli</span>
+            <a href="#" class="link-value" id="leggiTuttoLink" aria-expanded="false" aria-controls="dettagliContent">
+                <span id="leggiTuttoText">Leggi tutto</span>
+                <img src="arrow-down.png" alt="Espandi Dettagli" class="chevron-img" id="leggiTuttoChevron">
+            </a>
+        </div>
+        <div id="dettagliContent" class="collapsible-content">
+            <p>ASF Autolinee Srl</p>
+            <p>P.IVA 02660190139</p>
+        </div>
+
+        <div class="detail-item row-layout">
+            <span class="label light">Codice Ticket:</span>
+            <span class="value light-value">7325/1036051</span>
+        </div>
+        <!-- "Note" section REMOVED -->
+    </div> <!-- End .card -->
+</div> <!-- End .scroll-view -->
+
+<div id="qrModal" class="modal-overlay">
+    <div class="modal-content">
+        <span class="close-modal-btn" id="closeQrBtn">×</span>
+        <img src="" alt="QR Code Ingrandito" id="enlargedQrImage" class="qr-modal-image">
+    </div>
+</div>
+
+</body>
+<script src="ticket_75min.js"></script>
+</html>
