@@ -4,15 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Biglietto 75 Minuti</title>
-    <!-- Font Awesome might still be used for fixed-header back arrow -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="/75min/manifest.json"> <!-- Assuming manifest path is correct -->
+    <link rel="manifest" href="manifest.json"> <!-- Assuming manifest.json is in the same directory as this index.html -->
 </head>
 <body>
 
 <div class="fixed-header">
-    <i class="fas fa-chevron-left back-arrow" onclick="history.back()"></i>
+    <button class="back-button" id="backButton" aria-label="Indietro">
+        <i class="fas fa-chevron-left"></i>
+    </button>
     <span class="header-title">Ticket attivo</span>
 </div>
 
@@ -30,28 +31,25 @@
             <span class="sub-title">Titolo di viaggio integrato valido su tutte le linee con percorrenza urbana per 75′</span>
         </div>
 
-        <!-- "Informazioni tessera" section REMOVED -->
-
-        <div class="validation-loop-wrapper">
+        <section class="validation-loop-wrapper">
             <div class="clickable-header" id="validationHeaderButton" role="button" aria-expanded="true" aria-controls="validationContentArea">
                 <div class="icon-text-container">
-                    <img src="validazione.png" alt="Icona Validazione">
+                    <img src="validazione.png" alt="Icona Validazione" class="icon icon-validation">
                     <span>Controllo e validazione</span>
                 </div>
                 <img src="arrow-down.png" alt="Comprimi" class="chevron-img open-chevron" id="validationChevron">
             </div>
-            <!-- MODIFIED LINE: Removed inline style attribute -->
             <div id="validationContentArea" class="collapsible-content open-content">
                 <img src="qr-code.png" class="qr-code-small" alt="QR Code" id="smallQrImage">
-                <button class="text-button-link underline" id="enlargeQrButton">Ingrandisci QRCode</button>
+                <button type="button" class="text-button-link underline" id="enlargeQrButton">Ingrandisci QRCode</button>
                 <div class="time-code-row">
                     <div class="icon-text">
-                        <img src="clock.png" alt="Icona Orologio">
+                        <img src="clock.png" alt="Icona Orologio" class="icon icon-clock">
                         <span id="liveClock">--:--:--</span>
                     </div>
                     <div class="icon-text">
-                        <img src="lock.png" alt="Icona Lucchetto">
-                        <span>862</span>
+                        <img src="lock.png" alt="Icona Lucchetto" class="icon icon-lock">
+                        <span>862</span> <!-- Consider making this dynamic if needed -->
                     </div>
                 </div>
             </div>
@@ -63,7 +61,7 @@
                     <img src="image.png" alt="Animated Zigzag Pattern 3">
                 </div>
             </div>
-        </div>
+        </section>
 
         <div class="status-banner" id="ticketStatusBanner">
             <div id="tempoRestante">Tempo restante: --</div>
@@ -79,14 +77,14 @@
             <span class="price-value">1,50 €</span>
         </div>
 
-        <hr class="separator">
+        <!-- The <hr> is removed; its visual effect is now handled by CSS border on the next section -->
 
-        <div class="detail-item row-layout">
+        <div class="detail-item row-layout details-toggle-section">
             <span class="label">Dettagli</span>
-            <a href="#" class="link-value" id="leggiTuttoLink" aria-expanded="false" aria-controls="dettagliContent">
+            <button type="button" class="link-value" id="leggiTuttoLink" aria-expanded="false" aria-controls="dettagliContent">
                 <span id="leggiTuttoText">Leggi tutto</span>
                 <img src="arrow-down.png" alt="Espandi Dettagli" class="chevron-img" id="leggiTuttoChevron">
-            </a>
+            </button>
         </div>
         <div id="dettagliContent" class="collapsible-content">
             <p>ASF Autolinee Srl</p>
@@ -95,15 +93,14 @@
 
         <div class="detail-item row-layout">
             <span class="label light">Codice Ticket:</span>
-            <span class="value light-value">7325/1036051</span>
+            <span class="value light-value">7325/1036051</span> <!-- Consider making this dynamic if needed -->
         </div>
-        <!-- "Note" section REMOVED -->
     </div> <!-- End .card -->
 </div> <!-- End .scroll-view -->
 
 <div id="qrModal" class="modal-overlay">
     <div class="modal-content">
-        <span class="close-modal-btn" id="closeQrBtn">×</span>
+        <span class="close-modal-btn" id="closeQrBtn" role="button" aria-label="Chiudi modale">×</span>
         <img src="" alt="QR Code Ingrandito" id="enlargedQrImage" class="qr-modal-image">
     </div>
 </div>

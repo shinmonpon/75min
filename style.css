@@ -19,7 +19,7 @@
     --qr-button-color: #2c146c;
     --time-code-color: #92e2ed;
     --text-on-accent-bg: #ffffff;
-    --status-banner-bg: #2A7345; /* Specific for this ticket type */
+    --status-banner-bg: #2A7345;
     --separator-color: #e0e0e0;
     --label-color: #555555;
     --section-border-color: #efefef;
@@ -36,7 +36,8 @@
 body {
     margin: 0;
     font-family: var(--main-font);
-    background-color: var(--body-bg-color); color: var(--card-text-color);
+    background-color: var(--body-bg-color);
+    color: var(--card-text-color);
     overscroll-behavior-y: contain;
 }
 
@@ -46,17 +47,36 @@ body {
     display: flex; align-items: center; padding: 0 16px;
     box-sizing: border-box; z-index: 1000;
 }
-.fixed-header .back-arrow {
-    font-family: "Font Awesome 6 Free"; /* For FA back arrow */
-    font-weight: 900;
-    content: "\f053";
-    font-size: 20px; cursor: pointer;
-    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+.fixed-header .back-button {
+    background: none;
+    border: none;
+    color: var(--header-text-color);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 10px 0 0; /* Give some clickable area */
+    margin-left: -10px; /* Counteract padding for visual alignment if needed */
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%; /* Make button as tall as header for easier tap */
+}
+.fixed-header .back-button .fa-chevron-left {
+    /* Font Awesome styles are usually inherited */
 }
 .fixed-header .header-title {
     font-size: 20px; font-weight: bold;
     text-align: center; flex-grow: 1;
+    /* Ensure title is centered even with absolute positioned button */
+    margin-left: auto; /* Push title to center */
+    margin-right: auto; /* Push title to center */
+    padding-left: 30px; /* Space for back button area */
+    padding-right: 30px; /* Balance padding */
 }
+
 
 /* --- Pull to Refresh Styles --- */
 .ptr-indicator {
@@ -83,7 +103,6 @@ body {
     height: var(--ptr-gear-size);
     object-fit: contain;
 }
-/* --- End Pull to Refresh Styles --- */
 
 .scroll-view {
     max-width: 560px; margin: 0 auto;
@@ -91,7 +110,7 @@ body {
     padding-top: var(--header-height);
     position: relative;
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    background-color: var(--body-bg-color);
+    /* background-color: var(--body-bg-color); /* Removed, body handles this */
     min-height: calc(100vh - var(--header-height));
     box-sizing: border-box;
 }
@@ -144,16 +163,15 @@ body {
     border-bottom: 1px solid var(--section-border-color);
     border-radius: 0 0 var(--button-border-radius) var(--button-border-radius);
     transition: max-height 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-    padding: 0; /* MODIFICATION: No padding when closed */
+    padding: 0;
 }
 
-/* MODIFICATION: Apply all necessary padding for #validationContentArea when open */
 #validationContentArea.open-content {
-    padding: 16px; /* Sets 16px padding on all sides. Adjust if needed, e.g., padding-bottom: 0; */
+    padding: 16px;
 }
 .qr-code-small {
     max-width: 220px; width: auto; height: auto;
-    display: block; margin: 0 auto; /* Removed bottom margin here as container padding will handle spacing */
+    display: block; margin: 0 auto 16px auto; /* Re-added margin-bottom for spacing within this specific container */
     border: none;
 }
 .text-button-link {
@@ -161,6 +179,7 @@ body {
     font-weight: bold; padding: 8px 0; cursor: pointer;
     display: block; margin: 0 auto; text-align: center;
     font-size: 15px;
+    font-family: inherit; /* Ensure it uses main font */
 }
 .text-button-link.underline { text-decoration: underline; }
 .text-button-link.underline:hover { text-decoration: underline; }
@@ -168,13 +187,17 @@ body {
 .time-code-row {
     display: flex; justify-content: space-between; align-items: center;
     font-size: 16px; font-weight: 500;
+    margin-top: 16px; /* Added margin for spacing from button above */
 }
 .time-code-row .icon-text span { color: var(--time-code-color); }
 
 .icon-text { display: flex; align-items: center; gap: 8px; }
-img[src="validazione.png"] { width: 26px; height: 22px; object-fit: contain; vertical-align: middle;}
-img[src="clock.png"] { width: 25px; height: 25px; object-fit: contain; vertical-align: middle;}
-img[src="lock.png"] { width: 15px; height: 16px; object-fit: contain; vertical-align: middle;}
+/* Using classes for icons (optional, but good practice) */
+.icon { display: inline-block; vertical-align: middle; object-fit: contain; }
+.icon-validation { width: 26px; height: 22px; }
+.icon-clock { width: 25px; height: 25px; }
+.icon-lock { width: 15px; height: 16px; }
+
 .loop-image-container { position: relative; width: 100%; height: 57px; overflow: hidden; }
 .loop-scrolling-image {
     position: absolute; top: 0; height: 100%; width: calc(367px * 3);
@@ -201,11 +224,13 @@ img[src="lock.png"] { width: 15px; height: 16px; object-fit: contain; vertical-a
 }
 .status-banner.active { display: block; }
 .status-banner strong { font-weight: bold; }
-.status-banner div {}
 
 @media (max-width: 600px) {
     .status-banner {
-        width: 368px; min-height: 52px; height: auto; display: none;
+        width: calc(100% - 32px); /* Make it responsive within card padding */
+        margin-left: 16px;
+        margin-right: 16px;
+        min-height: 52px; height: auto; display: none;
         flex-direction: column; justify-content: center; padding: 8px 12px;
     }
     .status-banner.active { display: flex; }
@@ -227,57 +252,87 @@ img[src="lock.png"] { width: 15px; height: 16px; object-fit: contain; vertical-a
     color: var(--card-text-color); font-weight: 500;
 }
 .price-value { font-size: 22px; font-weight: bold; color: var(--card-text-color); }
-.detail-item .link-value {
+
+/* Styling for the button that replaced the <a> tag for "Leggi Tutto" */
+#leggiTuttoLink.link-value {
+    background: none;
+    border: none;
+    padding: 0; /* Reset button padding */
+    font-family: inherit;
+    font-size: inherit; /* Ensure it matches surrounding text if needed */
     color: var(--time-code-color);
-    text-decoration: none; font-weight: bold;
-    display: flex; align-items: center; gap: 5px; cursor: pointer;
+    text-decoration: none;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
 }
-.detail-item .link-value:hover { text-decoration: underline; }
-.detail-item .link-value .chevron-img {
+#leggiTuttoLink.link-value:hover { text-decoration: underline; }
+#leggiTuttoLink.link-value .chevron-img {
     width: var(--chevron-size); height: var(--chevron-size);
     object-fit: contain; transition: transform 0.3s ease-in-out;
 }
-.detail-item .link-value .chevron-img.open-chevron { transform: rotate(180deg); }
+#leggiTuttoLink.link-value .chevron-img.open-chevron { transform: rotate(180deg); }
 
-.separator { border: none; height: 1px; background-color: var(--separator-color); margin: 0; }
+
+/* Replaces the <hr> element */
+.details-toggle-section {
+    border-top: 1px solid var(--separator-color);
+    padding-top: 20px; /* Spacing that the hr might have provided */
+    margin-top: 20px; /* Spacing that the hr might have provided */
+}
+
 
 /* QR Modal Styles */
 .modal-overlay {
     display: none; position: fixed; z-index: 1050; left: 0; top: 0;
     width: 100%; height: 100%; overflow: auto;
+    background-color: rgba(0,0,0,0.7); /* Added semi-transparent background */
     justify-content: center; align-items: center;
 }
-#qrModal { background-color: #ffffff; }
 #qrModal .modal-content {
-    position: relative; background-color: transparent; box-shadow: none; padding: 0;
-    width: 100%; height: 100%; display: flex; flex-direction: column;
+    position: relative; background-color: var(--card-bg-color); /* Give it a background */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    padding: 20px;
+    border-radius: 8px;
+    width: auto; /* Let content define width up to max */
+    max-width: 95vw;
+    height: auto; /* Let content define height up to max */
+    max-height: 90vh;
+    display: flex; flex-direction: column;
     justify-content: center; align-items: center; text-align: center;
 }
 #qrModal .qr-modal-image {
-    max-width: 90vw; max-height: 80vh; width: auto; height: auto; object-fit: contain;
+    max-width: calc(100% - 40px); /* Account for modal padding */
+    max-height: calc(100% - 70px); /* Account for modal padding and close button */
+    width: auto; height: auto; object-fit: contain;
 }
 #qrModal .close-modal-btn {
-    position:absolute; top: 20px; right: 20px; color: #333333; font-size: 35px;
-    background-color: transparent; border-radius: 0; cursor: pointer;
+    position:absolute; top: 10px; right: 15px; color: #888; font-size: 30px;
+    font-weight: bold;
+    background-color: transparent; border:none; border-radius: 0; cursor: pointer;
     width: auto; height: auto; box-shadow: none; padding: 5px; z-index: 10;
+    line-height: 1;
 }
 #qrModal .close-modal-btn:hover { color: #000000; }
 
 #dettagliContent {
-    background-color: transparent; /* Overrides .collapsible-content background */
-    border: none; /* Overrides .collapsible-content borders */
-    border-radius: 0; /* Overrides .collapsible-content border-radius */
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
     font-size: 14px;
     color: var(--card-text-color);
-    /* max-height: 0; overflow: hidden; padding: 0; are inherited from .collapsible-content */
     transition: max-height 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55),
-    padding-top 0.3s ease-out 0.1s; /* For animating padding-top */
+    padding-top 0.3s ease-out 0.1s;
 }
-/* MODIFICATION: Apply all necessary padding for #dettagliContent when open */
 #dettagliContent.open-content {
     padding-top: 10px;
-    padding-left: 16px;  /* Assuming it also needs horizontal padding */
-    padding-right: 16px; /* Assuming it also needs horizontal padding */
-    /* padding-bottom: 10px; /* Add if consistent bottom padding is desired */
+    /* Assuming #dettagliContent does not need horizontal padding inside its own box,
+       as its parent .card already provides overall padding.
+       If it does, add:
+       padding-left: 16px;
+       padding-right: 16px;
+    */
 }
 #dettagliContent p { margin: 5px 0; font-weight: normal; }
