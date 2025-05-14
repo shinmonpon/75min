@@ -197,10 +197,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let ptrIsTouching = false;
     let ptrStartY = 0;
     let ptrPullDistance = 0;
-    let ptrIsRefreshing = false;
+    let ptrIsRefreshing = false; // This flag is now used to prevent re-entry during the brief sync action
     const PTR_THRESHOLD = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ptr-threshold')) || 70;
-    const PTR_MAX_PULL_VISUAL = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ptr-max-pull')) || 100;
-    const PTR_INDICATOR_HEIGHT = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ptr-indicator-height')) || 60;
+    const PTR_MAX_PULL_VISUAL = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ptr-max-pull')) || 200;
+    // const PTR_INDICATOR_HEIGHT = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ptr-indicator-height')) || 60; // Not directly needed for holding position anymore
 
 
     if (ptrScrollView && ptrIndicator && ptrCardElement && ptrGearImg) {
@@ -209,7 +209,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (ptrScrollView.scrollTop === 0) {
                 ptrIsTouching = true;
                 ptrStartY = e.touches[0].clientY;
-                ptrCardElement.style.transition = 'none';
+                ptrCardElement.style.transition = 'none'; // Disable transition during pull for direct manipulation
                 ptrGearImg.style.transition = 'transform 0.1s linear';
                 ptrIndicator.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
             }
@@ -221,7 +221,10 @@ document.addEventListener('DOMContentLoaded', function() {
             let diffY = e.touches[0].clientY - ptrStartY;
 
             if (ptrScrollView.scrollTop === 0 && diffY > 0) {
-                e.preventDefault();
+                // Only prevent default if we are actually handling the pull-to-refresh gesture
+                // to allow normal scroll otherwise, though scrollTop === 0 check should mostly handle this.
+                if (ptrIsTouching) e.preventDefault(); 
+                
                 ptrPullDistance = diffY;
                 let visualPull = Math.min(ptrPullDistance, PTR_MAX_PULL_VISUAL);
 
@@ -229,11 +232,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 ptrIndicator.classList.add('ptr-visible');
 
                 let scale = Math.min(0.8 + (ptrPullDistance / PTR_THRESHOLD) * 0.2, 1);
-                let rotation = ptrPullDistance * 2;
+                let rotation = ptrPullDistance * 2; // Rotate gear based on pull
                 ptrIndicator.style.transform = `translateY(${visualPull * 0.2}px) scale(${scale})`;
                 ptrGearImg.style.transform = `rotate(${rotation}deg)`;
 
-            } else if (diffY < 0 && ptrPullDistance > 0) {
+            } else if (diffY < 0 && ptrPullDistance > 0) { // Pulling back up before release
                 ptrPullDistance = Math.max(0, ptrPullDistance + diffY);
                 let visualPull = Math.min(ptrPullDistance, PTR_MAX_PULL_VISUAL);
                 ptrCardElement.style.transform = `translateY(${visualPull * 0.6}px)`;
@@ -241,41 +244,47 @@ document.addEventListener('DOMContentLoaded', function() {
                 ptrIndicator.style.transform = `translateY(${visualPull * 0.2}px) scale(${scale})`;
                 if(ptrPullDistance === 0) {
                     ptrIndicator.classList.remove('ptr-visible');
-                    ptrIsTouching = false;
+                    ptrIsTouching = false; // No longer actively pulling
                 }
-                ptrStartY = e.touches[0].clientY;
+                ptrStartY = e.touches[0].clientY; // Update startY for subsequent moves if still pulling
             } else {
-                if (ptrIsTouching && ptrPullDistance > 0 && diffY <=0 ) {
+                 // If scrolling down normally after an initial small pull, or other edge cases
+                if (ptrIsTouching && ptrPullDistance > 0 && diffY <=0 ) { // Reset if scrolled away
                     ptrIsTouching = false;
-                    ptrCardElement.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                    ptrCardElement.style.transition = 'transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
                     ptrCardElement.style.transform = 'translateY(0px)';
                     ptrIndicator.classList.remove('ptr-visible');
                     ptrGearImg.style.transform = 'rotate(0deg)';
                     ptrPullDistance = 0;
                 }
             }
-        }, { passive: false });
+        }, { passive: false }); // passive:false because we call e.preventDefault()
 
         ptrScrollView.addEventListener('touchend', () => {
             if (!ptrIsTouching || ptrIsRefreshing) {
+                // This handles cases where touchend might fire without an active pull,
+                // or if ptrIsRefreshing is true (though it's true for a very short time now).
                 if (!ptrIsRefreshing && ptrCardElement.style.transform !== '' && ptrCardElement.style.transform !== 'translateY(0px)') {
-                    ptrCardElement.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                    // If card is displaced but not refreshing, animate it back.
+                    ptrCardElement.style.transition = 'transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
                     ptrCardElement.style.transform = 'translateY(0px)';
+                    ptrIndicator.classList.remove('ptr-visible'); // Ensure indicator also hides
+                    ptrGearImg.style.transform = 'rotate(0deg)';
                 }
-                ptrIsTouching = false;
+                ptrIsTouching = false; // Ensure this is reset
                 return;
             }
             ptrIsTouching = false;
 
+            // Apply transitions for the snap-back animation
             ptrCardElement.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            ptrGearImg.style.transition = 'transform 0.3s ease-in-out';
+            ptrGearImg.style.transition = 'transform 1s ease-in-out'; // For gear rotation reset
 
             if (ptrPullDistance > PTR_THRESHOLD) {
-                ptrIsRefreshing = true;
-                ptrIndicator.classList.add('ptr-refreshing');
-                ptrCardElement.style.transform = `translateY(${PTR_INDICATOR_HEIGHT * 0.7}px)`;
+                ptrIsRefreshing = true; // Mark as "refreshing" for the duration of this synchronous block
 
                 console.log("Simulating refresh via Pull-to-Refresh...");
+                // --- Actual refresh logic ---
                 if (localStorage.getItem(ACTIVATION_STORAGE_KEY)) {
                     localStorage.removeItem(ACTIVATION_STORAGE_KEY);
                     if(countdownTimerInterval) {
@@ -290,21 +299,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     console.log("No active timer to reset by PTR.");
                 }
+                // --- End of actual refresh logic ---
 
-                setTimeout(() => {
-                    ptrCardElement.style.transform = 'translateY(0px)';
-                    ptrIndicator.classList.remove('ptr-visible');
-                    ptrIndicator.classList.remove('ptr-refreshing');
-                    ptrGearImg.style.transform = 'rotate(0deg)';
-                    ptrIsRefreshing = false;
-                    console.log("Pull-to-Refresh UI reset complete.");
-                }, 1500);
+                // --- Immediately reset UI elements (they will animate due to transitions) ---
+                ptrCardElement.style.transform = 'translateY(0px)';
+                ptrIndicator.classList.remove('ptr-visible');
+                // No ptrIndicator.classList.add('ptr-refreshing');
+                ptrGearImg.style.transform = 'rotate(0deg)'; // Reset gear rotation
+
+                ptrIsRefreshing = false; // Reset flag
+                console.log("Pull-to-Refresh action performed and UI reset immediately.");
+
             } else {
+                // Pulled, but not enough to trigger refresh: just animate back
                 ptrCardElement.style.transform = 'translateY(0px)';
                 ptrIndicator.classList.remove('ptr-visible');
                 ptrGearImg.style.transform = 'rotate(0deg)';
             }
-            ptrPullDistance = 0;
+            ptrPullDistance = 0; // Reset pull distance for the next interaction
         });
     }
 });
