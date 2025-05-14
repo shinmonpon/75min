@@ -1,0 +1,20 @@
+{
+  "name": "Arriva MyPay",
+  "short_name": "Arriva",
+  "start_url": "/75min/index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#348751",
+  "icons": [
+    {
+      "src": "/75min/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/75min/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
