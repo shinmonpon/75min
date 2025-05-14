@@ -152,8 +152,6 @@ body {
     border-bottom: 1px solid var(--section-border-color);
     border-radius: 0 0 var(--button-border-radius) var(--button-border-radius);
     transition: max-height 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55),
-    padding-top 0.3s ease-out 0.1s,
-    padding-bottom 0.3s ease-out 0.1s;
     padding-left: 16px;
     padding-right: 16px;
 }
