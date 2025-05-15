@@ -6,7 +6,7 @@
     <title>Biglietto 75 Minuti</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json"> <!-- Assuming manifest.json is in the same directory as this index.html -->
+    <link rel="manifest" href="manifest.json">
 </head>
 <body>
 
@@ -18,7 +18,31 @@
 </div>
 
 <div class="ptr-indicator" id="ptrIndicator">
-    <img src="loading-gear.png" alt="Loading..." class="ptr-gear-img" id="ptrGearImg">
+    <div id="ptrGearContainer" class="ptr-gear-img-container">
+        <svg id="ptrGearSvg" width="100%" height="100%" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+            <title>Loading Gear</title>
+            <style>
+                .ptr-spoke {
+                    fill: #FFFFFF; 
+                    opacity: 0.2; 
+                    transition: opacity 0.25s ease-in-out; /* For gradual spoke lighting */
+                }
+                .ptr-spoke.visible {
+                    opacity: 1;  
+                }
+            </style>
+            <g id="ptr-spokes-group" transform="translate(30 30)">
+                <rect class="ptr-spoke" id="ptr-spoke-0" x="-3" y="-26" width="6" height="18" rx="3" ry="3" />
+                <rect class="ptr-spoke" id="ptr-spoke-1" x="-3" y="-26" width="6" height="18" rx="3" ry="3" transform="rotate(45)"/>
+                <rect class="ptr-spoke" id="ptr-spoke-2" x="-3" y="-26" width="6" height="18" rx="3" ry="3" transform="rotate(90)"/>
+                <rect class="ptr-spoke" id="ptr-spoke-3" x="-3" y="-26" width="6" height="18" rx="3" ry="3" transform="rotate(135)"/>
+                <rect class="ptr-spoke" id="ptr-spoke-4" x="-3" y="-26" width="6" height="18" rx="3" ry="3" transform="rotate(180)"/>
+                <rect class="ptr-spoke" id="ptr-spoke-5" x="-3" y="-26" width="6" height="18" rx="3" ry="3" transform="rotate(225)"/>
+                <rect class="ptr-spoke" id="ptr-spoke-6" x="-3" y="-26" width="6" height="18" rx="3" ry="3" transform="rotate(270)"/>
+                <rect class="ptr-spoke" id="ptr-spoke-7" x="-3" y="-26" width="6" height="18" rx="3" ry="3" transform="rotate(315)"/>
+            </g>
+        </svg>
+    </div>
 </div>
 
 <div class="scroll-view" id="mainScrollView">
@@ -49,7 +73,7 @@
                     </div>
                     <div class="icon-text">
                         <img src="lock.png" alt="Icona Lucchetto" class="icon icon-lock">
-                        <span>862</span> <!-- Consider making this dynamic if needed -->
+                        <span>862</span> 
                     </div>
                 </div>
             </div>
@@ -58,7 +82,6 @@
                 <div class="loop-scrolling-image">
                     <img src="image.png" alt="Animated Zigzag Pattern 1">
                     <img src="image.png" alt="Animated Zigzag Pattern 2">
-                    <img src="image.png" alt="Animated Zigzag Pattern 3">
                 </div>
             </div>
         </section>
@@ -77,8 +100,6 @@
             <span class="price-value">1,50 €</span>
         </div>
 
-        <!-- The <hr> is removed; its visual effect is now handled by CSS border on the next section -->
-
         <div class="detail-item row-layout details-toggle-section">
             <span class="label">Dettagli</span>
             <button type="button" class="link-value" id="leggiTuttoLink" aria-expanded="false" aria-controls="dettagliContent">
@@ -87,16 +108,18 @@
             </button>
         </div>
         <div id="dettagliContent" class="collapsible-content">
-            <p>ASF Autolinee Srl</p>
-            <p>P.IVA 02660190139</p>
+            <p>La validità inizia dal momento della convalida e il titolo sarà valido per 75 minuti. 
+                Il biglietto potrà essere utilizzato per viaggiare su tutte le linee con percorrenza urbana a Como, 
+                salvo fatte le corse effettuate da BUS che espongono la lettera U barrata. ASF Autolinee Srl</p>
+            <p>·P.IVA 02660190139</p>
         </div>
 
         <div class="detail-item row-layout">
             <span class="label light">Codice Ticket:</span>
-            <span class="value light-value">7325/1036051</span> <!-- Consider making this dynamic if needed -->
+            <span class="value light-value">7325/1036051</span> 
         </div>
-    </div> <!-- End .card -->
-</div> <!-- End .scroll-view -->
+    </div> 
+</div> 
 
 <div id="qrModal" class="modal-overlay">
     <div class="modal-content">

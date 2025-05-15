@@ -1,5 +1,5 @@
 // --- Constants ---
-const TICKET_DURATION_MINUTES = 75;
+const TICKET_DURATION_MINUTES = 65;
 const ACTIVATION_STORAGE_KEY = 'ticket75ActivationTimestamp';
 const ROME_TIME_ZONE = 'Europe/Rome';
 const ROME_LOCALE = 'it-IT';
@@ -7,13 +7,32 @@ const ROME_DATE_OPTIONS = { timeZone: ROME_TIME_ZONE, day: '2-digit', month: '2-
 const ROME_TIME_OPTIONS = { timeZone: ROME_TIME_ZONE, hour: '2-digit', minute: '2-digit' };
 const ROME_DATE_TIME_OPTIONS = { timeZone: ROME_TIME_ZONE, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
 
-let countdownTimerInterval = null;
+const NUM_SPOKES = 8; 
+const THRESHOLD_ROTATE_DURATION = 2500; 
+const THRESHOLD_ROTATE_DEGREES = 180;   
+const SPOKE_PULSE_INTERVAL = 150;     
+const SPOKE_PULSE_TRAIL_LENGTH = 4; 
+const SPOKE_PULSE_MAX_OPACITY = 1.0;
+const SPOKE_PULSE_MIN_OPACITY = 0.2; 
+const SPOKE_PULSE_OPACITY_STEP = SPOKE_PULSE_TRAIL_LENGTH > 1 
+    ? (SPOKE_PULSE_MAX_OPACITY - SPOKE_PULSE_MIN_OPACITY) / (SPOKE_PULSE_TRAIL_LENGTH - 1) 
+    : 0;
+const DELAY_BEFORE_SPOKE_PULSE = 300; // Delay in ms after rotation starts, before pulse begins
 
-// --- Global DOM Element References (cached) ---
+
+let countdownTimerInterval = null;
 let activateTicketLogo, statusBanner, emessoIlValueElement, tempoRestanteElement, attivatoIlElement, liveClockElement;
 let qrModal, enlargeQrButton, smallQrImage, enlargedQrImage, closeQrBtn;
-let ptrScrollView, ptrIndicator, ptrGearImg, ptrCardElement;
+let ptrScrollView, ptrIndicator, ptrGearContainerEl, ptrGearSvgEl; 
+let ptrSpokeElements = [];
 let backButton;
+
+let ptrAnimationPhase = 'idle'; 
+let thresholdRotateStartTime = 0;
+let thresholdRotateRafId = null; 
+let spokePulseIntervalId = null;
+let spokePulseStartTimeoutId = null; // For delaying the spoke pulse
+let currentLeadingSpokeIndex = 0; 
 
 // --- Utility Functions ---
 function formatTimeForTimer(milliseconds) {
@@ -37,10 +56,10 @@ function updateLiveClock() {
 }
 
 function goBackOrHome() {
-    if (history.length > 1 && document.referrer) {
+    if (history.length > 1 && document.referrer && new URL(document.referrer).origin === window.location.origin) {
         history.back();
     } else {
-        window.location.href = 'home.html';
+        window.location.href = 'index.html'; 
     }
 }
 
@@ -71,7 +90,7 @@ function startTicketCountdown(trueActivationTimestamp) {
         }
     }
     if (countdownTimerInterval !== null) clearInterval(countdownTimerInterval);
-    countdownTimerInterval = null;
+    countdownTimerInterval = null; 
     updateDisplay();
     countdownTimerInterval = setInterval(updateDisplay, 1000);
     statusBanner.classList.add('active');
@@ -92,12 +111,26 @@ document.addEventListener('DOMContentLoaded', function() {
     closeQrBtn = document.getElementById('closeQrBtn');
     ptrScrollView = document.getElementById('mainScrollView');
     ptrIndicator = document.getElementById('ptrIndicator');
-    ptrGearImg = document.getElementById('ptrGearImg');
-    ptrCardElement = document.getElementById('mainCard');
+    
+    ptrGearContainerEl = document.getElementById('ptrGearContainer');
+    ptrGearSvgEl = document.getElementById('ptrGearSvg'); 
+    if (ptrGearContainerEl && ptrGearSvgEl) {
+        for (let i = 0; i < NUM_SPOKES; i++) {
+            const spoke = document.getElementById(`ptr-spoke-${i}`);
+            if (spoke) ptrSpokeElements.push(spoke);
+            else console.warn(`PTR Spoke 'ptr-spoke-${i}' not found.`);
+        }
+        if (ptrSpokeElements.length === 0 && NUM_SPOKES > 0) { 
+            console.error("PTR: No SVG spoke elements found. Spoke animation disabled.");
+        }
+    } else {
+        console.error("PTR: ptrGearContainer or ptrGearSvg not found. Ensure HTML is updated for SVG gear.");
+    }
 
     if (liveClockElement) { updateLiveClock(); setInterval(updateLiveClock, 1000); }
     if (backButton) { backButton.addEventListener('click', goBackOrHome); }
 
+    // --- Timer Logic ---
     if (tempoRestanteElement && attivatoIlElement && statusBanner && emessoIlValueElement) {
         const storedActivationTimestamp = localStorage.getItem(ACTIVATION_STORAGE_KEY);
         if (storedActivationTimestamp) {
@@ -121,207 +154,347 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // --- ASF Logo Click Activation ---
     if (activateTicketLogo) {
         activateTicketLogo.addEventListener('click', function() {
             const existingTimestamp = localStorage.getItem(ACTIVATION_STORAGE_KEY);
             let allowActivation = true;
             if (existingTimestamp) {
-                allowActivation = confirm("Un biglietto è già attivo o scaduto. Vuoi attivarne uno nuovo? Il timer e l'orario di emissione verranno resettati.");
+                const currentActivationTime = parseInt(existingTimestamp, 10);
+                const ticketEndTime = currentActivationTime + (TICKET_DURATION_MINUTES * 60 * 1000);
+                if (Date.now() < ticketEndTime) { 
+                    allowActivation = confirm("Un biglietto è già attivo. Vuoi attivarne uno nuovo sovrascrivendo quello attuale? Il timer e l'orario di emissione verranno resettati.");
+                } else { 
+                     allowActivation = confirm("Un biglietto precedente è scaduto. Vuoi attivarne uno nuovo? Il timer e l'orario di emissione verranno resettati.");
+                }
             }
             if (allowActivation) {
                 const trueActivationTimestamp = Date.now();
                 localStorage.setItem(ACTIVATION_STORAGE_KEY, trueActivationTimestamp.toString());
                 startTicketCountdown(trueActivationTimestamp);
-                console.log("Timer activated/reset by logo. Timestamp:", trueActivationTimestamp);
             }
         });
     }
 
+    // --- QR Code Modal Logic ---
     if (enlargeQrButton && qrModal && smallQrImage && enlargedQrImage && closeQrBtn) {
         enlargeQrButton.addEventListener('click', function() {
             if (smallQrImage.src) { enlargedQrImage.src = smallQrImage.src; qrModal.style.display = 'flex'; }
         });
         closeQrBtn.addEventListener('click', function() { qrModal.style.display = 'none'; });
-        window.addEventListener('click', function(event) {
+        qrModal.addEventListener('click', function(event) { 
             if (event.target === qrModal) { qrModal.style.display = 'none'; }
         });
     }
 
+    // --- Collapsible Sections Logic ---
     function setupCollapsible(buttonId, contentId, chevronId, startsOpen = false) {
         const button = document.getElementById(buttonId);
         const contentElement = document.getElementById(contentId);
         const chevronElement = document.getElementById(chevronId);
-        if (!button || !contentElement) return;
+        if (!button || !contentElement) {
+            return;
+        }
         const openContent = () => {
-            button.classList.add('open'); contentElement.classList.add('open-content');
-            requestAnimationFrame(() => { contentElement.style.maxHeight = contentElement.scrollHeight + "px"; });
+            button.classList.add('open'); 
+            contentElement.classList.add('open-content');
+            requestAnimationFrame(() => { 
+                contentElement.style.maxHeight = contentElement.scrollHeight + "px"; 
+            });
             if (chevronElement) chevronElement.classList.add('open-chevron');
             button.setAttribute('aria-expanded', 'true');
         };
         const closeContent = () => {
-            button.classList.remove('open'); contentElement.classList.remove('open-content');
-            contentElement.style.maxHeight = "0";
+            button.classList.remove('open'); 
+            contentElement.style.maxHeight = "0"; 
+            contentElement.classList.remove('open-content'); 
             if (chevronElement) chevronElement.classList.remove('open-chevron');
             button.setAttribute('aria-expanded', 'false');
         };
-        if (startsOpen) openContent(); else closeContent();
+
+        if (startsOpen) {
+            openContent();
+        } else {
+            closeContent(); 
+        }
+
         button.addEventListener('click', function(e) {
-            if (button.tagName.toLowerCase() === 'a' && button.getAttribute('href') === '#') e.preventDefault();
+            if (button.tagName.toLowerCase() === 'button' || (button.getAttribute('role') === 'button')) {
+                e.preventDefault();
+            }
             const isCurrentlyOpen = button.getAttribute('aria-expanded') === 'true';
-            if (isCurrentlyOpen) closeContent(); else openContent();
+            if (isCurrentlyOpen) {
+                closeContent();
+            } else {
+                openContent();
+            }
         });
     }
     setupCollapsible('validationHeaderButton', 'validationContentArea', 'validationChevron', true);
     setupCollapsible('leggiTuttoLink', 'dettagliContent', 'leggiTuttoChevron', false);
 
     // --- Pull-to-Refresh Logic ---
-    if (ptrScrollView && ptrIndicator && ptrCardElement && ptrGearImg) {
-        let ptrEligible = false; // True if touchstart occurred at top
-        let ptrIsActuallyPulling = false; // True if a pull gesture is active
+    if (ptrScrollView && ptrIndicator && ptrGearContainerEl && (ptrSpokeElements.length === NUM_SPOKES || NUM_SPOKES === 0) ) {
+        let ptrEligible = false;        
+        let ptrIsActive = false;        
         let ptrStartY = 0;
-        let ptrCurrentPullDistance = 0; // Tracks the current visual pull
-        let ptrIsRefreshing = false;
+        let ptrCurrentPullDistance = 0; 
 
-        const PTR_THRESHOLD_REFRESH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ptr-threshold')) || 70;
-        const PTR_MAX_PULL_VISUAL = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ptr-max-pull')) || 200;
-        const PTR_ACTIVATION_DRAG_THRESHOLD = 10; // Min drag Y to consider it a pull attempt
+        const PTR_TOP_THRESHOLD_REFRESH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ptr-threshold')) || 70;
+        const PTR_TOP_MAX_PULL_VISUAL = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ptr-max-pull')) || 180;
+        const PTR_TOP_ACTIVATION_DRAG_THRESHOLD = 10; 
+        const PTR_INDICATOR_HEIGHT_VALUE = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ptr-indicator-height')) || 60;
 
-        function resetPtrVisuals(animated = false) {
-            ptrCardElement.style.transition = animated ? 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'none';
-            ptrGearImg.style.transition = animated ? 'transform 0.3s ease-in-out' : 'none';
+
+        function clearAllPtrAnimations() {
+            if (thresholdRotateRafId) cancelAnimationFrame(thresholdRotateRafId);
+            if (spokePulseIntervalId) clearInterval(spokePulseIntervalId);
+            if (spokePulseStartTimeoutId) clearTimeout(spokePulseStartTimeoutId);
+            thresholdRotateRafId = null;
+            spokePulseIntervalId = null;
+            spokePulseStartTimeoutId = null;
+            ptrGearContainerEl.classList.remove('ptr-gear-spinning'); 
+            ptrGearContainerEl.style.transition = 'none'; 
+        }
+
+        function setSpokeOpacityBasedOnCount(count) { 
+            if (ptrSpokeElements.length === 0 && NUM_SPOKES > 0) return;
+            ptrSpokeElements.forEach((spoke, index) => {
+                if (index < count) {
+                    spoke.classList.add('visible');
+                } else {
+                    spoke.classList.remove('visible');
+                }
+            });
+        }
+        
+        function startTrailingSpokePulseAnimation() {
+            if (ptrSpokeElements.length !== NUM_SPOKES || NUM_SPOKES === 0) return;
+            if (spokePulseIntervalId) clearInterval(spokePulseIntervalId);
+            currentLeadingSpokeIndex = 0;
+
+            spokePulseIntervalId = setInterval(() => {
+                if (ptrAnimationPhase !== 'threshold_rotating' && ptrAnimationPhase !== 'spoke_pulsing') { 
+                    clearInterval(spokePulseIntervalId);
+                    spokePulseIntervalId = null;
+                    return;
+                }
+
+                ptrSpokeElements.forEach((spoke, index) => {
+                    let targetOpacity = SPOKE_PULSE_MIN_OPACITY; 
+                    for (let i = 0; i < SPOKE_PULSE_TRAIL_LENGTH; i++) {
+                        const trailSpokeIndex = (currentLeadingSpokeIndex - i + NUM_SPOKES) % NUM_SPOKES;
+                        if (index === trailSpokeIndex) {
+                            targetOpacity = SPOKE_PULSE_MAX_OPACITY - (i * SPOKE_PULSE_OPACITY_STEP);
+                            break; 
+                        }
+                    }
+                    spoke.style.opacity = Math.max(SPOKE_PULSE_MIN_OPACITY, targetOpacity).toFixed(2);
+                    if (parseFloat(spoke.style.opacity) > SPOKE_PULSE_MIN_OPACITY + 0.01) {
+                       if(!spoke.classList.contains('visible')) spoke.classList.add('visible');
+                    } else {
+                       if(spoke.classList.contains('visible')) spoke.classList.remove('visible');
+                    }
+                });
+                currentLeadingSpokeIndex = (currentLeadingSpokeIndex + 1) % NUM_SPOKES;
+            }, SPOKE_PULSE_INTERVAL);
+        }
+        
+        function resetPtrVisuals(animated = true) { 
+            clearAllPtrAnimations();
+            ptrAnimationPhase = 'idle';
+
+            ptrScrollView.style.transition = animated ? 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'none';
+            ptrScrollView.style.transform = 'translateY(0px)';
             
-            ptrCardElement.style.transform = 'translateY(0px)';
             ptrIndicator.classList.remove('ptr-visible');
-            ptrGearImg.style.transform = 'rotate(0deg)';
+            ptrIndicator.style.transform = ''; 
+            ptrIndicator.style.transition = 'opacity 0.25s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+
+            ptrGearContainerEl.style.transform = 'scale(1) rotate(0deg)'; 
+            if (NUM_SPOKES > 0 && ptrSpokeElements.length > 0) {
+                 ptrSpokeElements.forEach(spoke => {
+                    spoke.classList.remove('visible'); 
+                    spoke.style.opacity = ''; 
+                });
+            }
+            
             ptrCurrentPullDistance = 0;
         }
 
         ptrScrollView.addEventListener('touchstart', (e) => {
-            if (ptrIsRefreshing || e.touches.length > 1) return;
+            if (e.touches.length > 1) { ptrEligible = false; return; }
+            
+            clearAllPtrAnimations(); 
+            ptrAnimationPhase = 'idle'; 
+            
+            ptrGearContainerEl.style.transform = 'scale(1) rotate(0deg)'; 
+            if (NUM_SPOKES > 0 && ptrSpokeElements.length > 0) {
+                 ptrSpokeElements.forEach(spoke => {
+                    spoke.classList.remove('visible');
+                    spoke.style.opacity = ''; 
+                });
+            }
+            ptrIndicator.style.transition = 'opacity 0.25s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
 
-            if (ptrScrollView.scrollTop < 1) { // Check if at the top
-                ptrEligible = true;
-                ptrStartY = e.touches[0].clientY;
-                ptrIsActuallyPulling = false; // Reset pulling state
+
+            if (ptrScrollView.scrollTop < 1) { 
+                ptrEligible = true; ptrStartY = e.touches[0].clientY; ptrIsActive = false; 
                 ptrCurrentPullDistance = 0;
-                // Set transitions for immediate feedback if pulling starts
-                ptrCardElement.style.transition = 'none';
-                ptrGearImg.style.transition = 'transform 0.1s linear';
-                ptrIndicator.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+                
+                ptrScrollView.style.transition = 'none'; 
+                ptrGearContainerEl.style.transition = 'none'; 
             } else {
-                ptrEligible = false;
-                ptrIsActuallyPulling = false;
+                ptrEligible = false; ptrIsActive = false;
             }
         }, { passive: true });
 
         ptrScrollView.addEventListener('touchmove', (e) => {
-            if (!ptrEligible || ptrIsRefreshing || e.touches.length > 1) {
-                return; // Not eligible or busy
-            }
-
-            // If user scrolled away from top after touchstart, PTR is no longer active for this touch
-            if (ptrScrollView.scrollTop >= 1) {
-                if (ptrIsActuallyPulling) {
-                    resetPtrVisuals(true); // Animate back if was pulling
-                }
-                ptrEligible = false;
-                ptrIsActuallyPulling = false;
+            if (!ptrEligible || e.touches.length > 1) return;
+            if (ptrScrollView.scrollTop > 0) { 
+                if (ptrIsActive) resetPtrVisuals(true);
+                ptrEligible = false; ptrIsActive = false;
                 return;
             }
-
-            // At this point, touch started at top (ptrEligible=true) AND scroll is still at top.
+            
             const currentY = e.touches[0].clientY;
-            const diffY = currentY - ptrStartY; // Positive = pulling down
+            const diffY = currentY - ptrStartY; 
 
-            if (diffY > PTR_ACTIVATION_DRAG_THRESHOLD) { // User is intentionally pulling down
-                if (!ptrIsActuallyPulling) {
-                    ptrIsActuallyPulling = true; // Engage pull state
-                    // console.log("PTR: Start pulling");
+            if (diffY < 0 || (diffY <= PTR_TOP_ACTIVATION_DRAG_THRESHOLD && !ptrIsActive) ) {
+                if (ptrIsActive && diffY <= PTR_TOP_ACTIVATION_DRAG_THRESHOLD) {
+                    resetPtrVisuals(true); ptrIsActive = false; 
                 }
-                e.preventDefault(); // Prevent native scroll as we are handling pull
-
-                ptrCurrentPullDistance = diffY;
-                const visualPull = Math.min(ptrCurrentPullDistance, PTR_MAX_PULL_VISUAL);
-
-                ptrCardElement.style.transform = `translateY(${visualPull * 0.6}px)`;
-                ptrIndicator.classList.add('ptr-visible');
-                const scale = Math.min(0.8 + (ptrCurrentPullDistance / PTR_THRESHOLD_REFRESH) * 0.2, 1);
-                const rotation = ptrCurrentPullDistance * 2;
-                ptrIndicator.style.transform = `translateY(${visualPull * 0.2}px) scale(${scale})`;
-                ptrGearImg.style.transform = `rotate(${rotation}deg)`;
-
-            } else if (diffY < 0) { // User is moving finger upwards
-                if (ptrIsActuallyPulling) { // If was actively pulling, reduce/cancel the pull
-                    e.preventDefault(); // Still prevent native scroll
-
-                    ptrCurrentPullDistance = Math.max(0, ptrCurrentPullDistance + diffY); // diffY is negative
-                    const visualPull = Math.min(ptrCurrentPullDistance, PTR_MAX_PULL_VISUAL);
-                    
-                    ptrCardElement.style.transform = `translateY(${visualPull * 0.6}px)`;
-                    const scale = Math.min(0.8 + (ptrCurrentPullDistance / PTR_THRESHOLD_REFRESH) * 0.2, 1);
-                    const rotation = ptrCurrentPullDistance * 2;
-                    ptrIndicator.style.transform = `translateY(${visualPull * 0.2}px) scale(${scale})`;
-                    ptrGearImg.style.transform = `rotate(${rotation}deg)`;
-
-                    if (ptrCurrentPullDistance === 0) {
-                        ptrIndicator.classList.remove('ptr-visible');
-                        ptrIsActuallyPulling = false; // No longer actively pulling
-                        // console.log("PTR: Pull fully undone during move");
-                    }
-                }
-                // If not ptrIsActuallyPulling and diffY < 0:
-                // This means user touched at top and immediately tried to scroll "past" the top upwards.
-                // We don't preventDefault, allowing any native bounce/overscroll effect.
-                // ptrEligible remains true. If they then pull down, it can still trigger.
-            } else { // diffY is small (0 to PTR_ACTIVATION_DRAG_THRESHOLD)
-                if (ptrIsActuallyPulling) {
-                    e.preventDefault(); // Maintain pull state if already pulling
-                }
-                // If not pulling and diffY is small, do nothing. This allows small jitters.
+                return; 
             }
-        }, { passive: false });
+            if (!ptrIsActive) ptrIsActive = true; 
+            e.preventDefault(); 
+
+            ptrCurrentPullDistance = diffY; 
+            const visualPullOfScrollView = Math.min(ptrCurrentPullDistance, PTR_TOP_MAX_PULL_VISUAL);
+            ptrScrollView.style.transform = `translateY(${visualPullOfScrollView}px)`;
+
+            ptrIndicator.classList.add('ptr-visible');
+            let indicatorTranslateYValue = (visualPullOfScrollView / 2) - (PTR_INDICATOR_HEIGHT_VALUE / 2);
+            indicatorTranslateYValue = Math.max(0, indicatorTranslateYValue); 
+            indicatorTranslateYValue = Math.min(indicatorTranslateYValue, visualPullOfScrollView - PTR_INDICATOR_HEIGHT_VALUE * 0.5 + 10 );
+
+            const indicatorPullProgress = Math.min(ptrCurrentPullDistance / PTR_TOP_THRESHOLD_REFRESH, 1.0);
+            const currentIndicatorScale = 0.8 + (indicatorPullProgress * 0.2); 
+
+            ptrIndicator.style.transform = `translateY(${indicatorTranslateYValue}px) scale(${currentIndicatorScale})`;
+            ptrIndicator.style.transition = 'none'; 
+
+
+            if (ptrCurrentPullDistance > PTR_TOP_THRESHOLD_REFRESH) {
+                if (ptrAnimationPhase !== 'threshold_rotating' && ptrAnimationPhase !== 'spoke_pulsing') {
+                    clearAllPtrAnimations(); 
+                    ptrAnimationPhase = 'threshold_rotating';
+                    if (NUM_SPOKES > 0 && ptrSpokeElements.length > 0) {
+                        ptrSpokeElements.forEach(spoke => {
+                            spoke.classList.add('visible'); // Make all spokes visible for rotation
+                            spoke.style.opacity = SPOKE_PULSE_MAX_OPACITY; // Ensure they are bright
+                        });
+                    }
+                    
+                    thresholdRotateStartTime = performance.now();
+                    ptrGearContainerEl.style.transform = 'rotate(0deg) scale(1)'; 
+                    ptrGearContainerEl.style.transition = 'none'; 
+
+                    // Start spoke pulsing after a delay, during the rotation
+                    if (spokePulseStartTimeoutId) clearTimeout(spokePulseStartTimeoutId);
+                    spokePulseStartTimeoutId = setTimeout(() => {
+                        if (ptrIsActive && ptrCurrentPullDistance > PTR_TOP_THRESHOLD_REFRESH &&
+                            (ptrAnimationPhase === 'threshold_rotating' || ptrAnimationPhase === 'spoke_pulsing')) {
+                            
+                            // If rotation phase is technically still 'threshold_rotating', update it as pulse is now primary driver
+                            if(ptrAnimationPhase === 'threshold_rotating') ptrAnimationPhase = 'spoke_pulsing';
+
+                            if (NUM_SPOKES > 0 && ptrSpokeElements.length === NUM_SPOKES) {
+                                startTrailingSpokePulseAnimation();
+                            }
+                        }
+                        spokePulseStartTimeoutId = null;
+                    }, DELAY_BEFORE_SPOKE_PULSE);
+
+
+                    function animateThresholdRotation() {
+                        if (ptrAnimationPhase !== 'threshold_rotating' && ptrAnimationPhase !== 'spoke_pulsing') { 
+                            if(thresholdRotateRafId) cancelAnimationFrame(thresholdRotateRafId);
+                            thresholdRotateRafId = null;
+                            return; 
+                        }
+                        const elapsedTime = performance.now() - thresholdRotateStartTime;
+                        let rawProgress = elapsedTime / THRESHOLD_ROTATE_DURATION;
+                        
+                        let easedProgress = 1 - Math.pow(1 - rawProgress, 3); 
+                        easedProgress = Math.min(easedProgress, 1.0); 
+
+                        const currentRotation = easedProgress * THRESHOLD_ROTATE_DEGREES;
+                        ptrGearContainerEl.style.transform = `rotate(${currentRotation}deg) scale(1)`;
+
+                        if (rawProgress < 1.0 && ptrIsActive) { 
+                            thresholdRotateRafId = requestAnimationFrame(animateThresholdRotation);
+                        } else { 
+                            thresholdRotateRafId = null;
+                            // Rotation is done. If spoke pulse hasn't started yet (e.g. DELAY_BEFORE_SPOKE_PULSE > THRESHOLD_ROTATE_DURATION)
+                            // and we are still in a valid state, start it now.
+                            if (ptrIsActive && ptrAnimationPhase === 'threshold_rotating') { 
+                                ptrAnimationPhase = 'spoke_pulsing'; 
+                                ptrGearContainerEl.style.transform = `rotate(${THRESHOLD_ROTATE_DEGREES % 360}deg) scale(1)`; 
+                                if (NUM_SPOKES > 0 && ptrSpokeElements.length === NUM_SPOKES && !spokePulseIntervalId) { 
+                                    startTrailingSpokePulseAnimation();
+                                }
+                            } else if (ptrIsActive && ptrAnimationPhase === 'spoke_pulsing') {
+                                // Ensure final rotation angle if pulse started mid-rotation and this is the natural end of rotation
+                                ptrGearContainerEl.style.transform = `rotate(${THRESHOLD_ROTATE_DEGREES % 360}deg) scale(1)`;
+                            }
+                        }
+                    }
+                    if(thresholdRotateRafId) cancelAnimationFrame(thresholdRotateRafId); 
+                    thresholdRotateRafId = requestAnimationFrame(animateThresholdRotation);
+                }
+            } else { 
+                if (ptrAnimationPhase === 'threshold_rotating' || ptrAnimationPhase === 'spoke_pulsing') {
+                    clearAllPtrAnimations();
+                    ptrGearContainerEl.style.transform = 'scale(1) rotate(0deg)'; 
+                }
+                ptrAnimationPhase = 'spoke_loading'; 
+                
+                if (NUM_SPOKES > 0 && ptrSpokeElements.length === NUM_SPOKES) {
+                    const pullRatioForSpokes = Math.min(ptrCurrentPullDistance / PTR_TOP_THRESHOLD_REFRESH, 1.0);
+                    let spokesToShow = Math.floor(pullRatioForSpokes * NUM_SPOKES);
+                    spokesToShow = Math.max(0, Math.min(spokesToShow, NUM_SPOKES));
+                    setSpokeOpacityBasedOnCount(spokesToShow); 
+                }
+                ptrGearContainerEl.style.transform = 'scale(1) rotate(0deg)'; 
+                
+                if(ptrCurrentPullDistance < PTR_TOP_ACTIVATION_DRAG_THRESHOLD / 2 ) { 
+                    ptrIndicator.classList.remove('ptr-visible');
+                    if (ptrAnimationPhase !== 'idle') resetPtrVisuals(false); 
+                }
+            }
+        }, { passive: false }); 
 
         ptrScrollView.addEventListener('touchend', () => {
-            const wasEligible = ptrEligible;
-            const wasActuallyPulling = ptrIsActuallyPulling;
+            const wasEligibleForPTR = ptrEligible; 
+            const wasPTRActive = ptrIsActive;     
 
-            ptrEligible = false;
-            ptrIsActuallyPulling = false;
+            ptrEligible = false; ptrIsActive = false;
+            clearAllPtrAnimations(); 
+            ptrAnimationPhase = 'idle'; 
 
-            if (!wasEligible || ptrIsRefreshing) {
-                if (!ptrIsRefreshing && ptrCardElement.style.transform !== 'translateY(0px)') {
-                    resetPtrVisuals(true); // Snap back if displaced without eligibility
-                }
-                return;
+            ptrIndicator.style.transition = 'opacity 0.25s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+
+            if (wasEligibleForPTR && wasPTRActive) {
+                resetPtrVisuals(true);
+            } else if (wasEligibleForPTR && 
+                       ( (ptrScrollView.style.transform && ptrScrollView.style.transform !== 'translateY(0px)' && getComputedStyle(ptrScrollView).transform !== 'none') || 
+                         (ptrIndicator.classList.contains('ptr-visible')) ) ) {
+                resetPtrVisuals(true);
             }
-
-            if (wasActuallyPulling && ptrCurrentPullDistance > PTR_THRESHOLD_REFRESH) {
-                ptrIsRefreshing = true;
-                // console.log("PTR: Refresh triggered");
-                // No visual change for ptrIndicator.classList.add('ptr-refreshing');
-                // Card stays slightly pulled down during the "fake" refresh time
-                ptrCardElement.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-                // Hold the card slightly down to indicate refresh, then snap back
-                // ptrCardElement.style.transform = `translateY(${PTR_INDICATOR_HEIGHT * 0.3}px)`; // Optional: hold indicator position
-
-                if (localStorage.getItem(ACTIVATION_STORAGE_KEY)) {
-                    // console.log("Active timer found. Timer state and related UI will NOT be changed by Pull-to-Refresh.");
-                } else {
-                    // console.log("No active timer. Pull-to-Refresh has no timer state to affect.");
-                }
-                
-                // Simulate refresh duration then reset
-                // For your case, we just snap back immediately as per earlier requirements.
-                setTimeout(() => { // Using timeout just to ensure transitions apply for snap-back
-                    resetPtrVisuals(true);
-                    ptrIsRefreshing = false;
-                    // console.log("PTR: Refresh UI reset complete.");
-                }, 50); // Short delay, effectively immediate snap back after logic
-            } else {
-                // console.log("PTR: Pull ended, no refresh threshold.");
-                resetPtrVisuals(true); // Animate back if not refreshing
-            }
-            // ptrCurrentPullDistance is reset within resetPtrVisuals or on next touchstart
         });
+
+    } else {
+        console.warn("Pull-to-refresh disabled: Required elements not found.");
     }
 });
